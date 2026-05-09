@@ -46,7 +46,10 @@ def constraints(state: State, action: Action) -> np.ndarray:
     sel = action.selected.astype(bool)
     util = sel.mean()
     pq_cost = state.pq_service_time[action.pq_scheme] - 0.10  # SLA: 100 ms
-    drop_cost = float(state.rho[sel].mean()) - 0.30 if sel.any() else 0.0
+    if len(state.rho) == len(sel):
+        drop_cost = float(state.rho[sel].mean()) - 0.30 if sel.any() else 0.0
+    else:
+        drop_cost = float(np.mean(state.rho)) - 0.30 if sel.any() else 0.0
     return np.array([util - 0.6, pq_cost, drop_cost])
 
 

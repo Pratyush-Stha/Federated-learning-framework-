@@ -1,0 +1,211 @@
+QRQ-FL Implementation Plan (Theory vs Practical)
+================================================
+
+Scope
+-----
+Goal: Provide a stage-by-stage description of how QRQ-FL is implemented in this repo,
+what the intended theory/idea is, and what is actually achieved practically today.
+
+Primary runnable artifact:
+  - impl/QRQFL_colab.ipynb  (runs on Google Colab + locally)
+
+Secondary runnable artifact (advanced):
+  - impl/main.py (Flower-based CLI driver; notebook is preferred)
+
+
+Stage 0 — Baseline problem definition
+-------------------------------------
+THEORY:
+  Federated Learning (FL) suffers from:
+    - stragglers and dropouts (unreliable clients)
+    - latency constraints / deadline delivery probability (γ)
+    - overhead from (post-quantum) cryptography and secure aggregation
+  QRQ-FL aims to jointly control client selection + PQ scheme choice under constraints.
+
+PRACTICAL (THIS REPO):
+  - Uses real vision datasets (CIFAR-10 / CIFAR-100) downloaded via torchvision.
+  - Runs FL rounds in a Flower simulation.
+  - Evaluates global model accuracy centrally each round.
+
+WHERE IN CODE:
+  - impl/QRQFL_colab.ipynb (dataset choice, federation size, run loop)
+
+
+Stage 1 — Real dataset and non-IID client partitioning
+------------------------------------------------------
+THEORY:
+  Each client holds a non-IID slice of data, creating statistical heterogeneity.
+  Dirichlet partitioning (α) is a standard model for label skew.
+
+PRACTICAL (ACHIEVED):
+  - CIFAR-10 or CIFAR-100 is downloaded.
+  - Training set is partitioned into N clients using Dirichlet(α).
+  - Each client gets its own DataLoader.
+
+WHERE IN CODE:
+  - impl/data/partition.py -> dirichlet_partition()
+  - impl/QRQFL_colab.ipynb -> “Real dataset + Dirichlet non-IID split”
+
+OUTPUTS:
+  - Printed min/median/max client dataset sizes
+
+
+Stage 2 — Model and local training (client compute)
+---------------------------------------------------
+THEORY:
+  Each selected client runs local SGD for E local epochs and returns updated weights.
+
+PRACTICAL (ACHIEVED):
+  - A small CNN is used (same architecture pattern as impl/main.py).
+  - Each selected client trains for LOCAL_EPOCHS using SGD.
+
+WHERE IN CODE:
+  - impl/QRQFL_colab.ipynb -> model definition + hyperparameters
+  - impl/fl/client.py -> QRQClient.fit() local SGD implementation
+
+OUTPUTS:
+  - Centralized test accuracy and loss each round (server-side evaluation).
+
+
+Stage 3 — Reliability modeling with a Hidden Markov Model (HMM)
+---------------------------------------------------------------
+THEORY:
+  Clients have hidden reliability states (Online/Busy/Offline/Byzantine).
+  Observations (e.g., update received/missing/deviation flag) drive posterior dropout
+  probability rho_i(t) used for decision-making.
+
+PRACTICAL (ACHIEVED):
+  - A 4-state HMM forward filter is implemented in NumPy.
+  - Server tracks a simple observation history per client:
+      0 = ok (client returned update)
+      1 = missing (client failed / dropped)
+    (deviation-flag is supported by the emission model, but not fully driven by a
+     real attack detector in the current pipeline)
+  - rho_i(t) is computed from the filtered posterior and used in scheduling.
+
+WHERE IN CODE:
+  - impl/hmm/reliability.py -> forward(), dropout_probability(), HMMParams
+  - impl/fl/strategy.py -> configure_fit(): computes rho from obs history
+
+WHAT’S NOT FULLY DONE YET:
+  - A real “deviation-flag” detector and true Byzantine behavior simulation.
+  - Fitting HMM parameters from a real device trace (the fitter exists, not wired into
+    the main training notebook run).
+
+
+Stage 4 — Queueing/latency constraints and virtual queues
+---------------------------------------------------------
+THEORY:
+  Model the system as multi-stage queues (uplink, PQ, aggregation, blockchain) and
+  enforce latency/deadline constraints using virtual queues Q(t) (Lyapunov methods).
+
+PRACTICAL (PARTIALLY ACHIEVED):
+  - The DPP layer maintains virtual queues Q and updates them each round based on
+    constraint signals g(s,a).
+  - The constraints currently use proxies:
+      - utilization term
+      - PQ cost vs an SLA threshold (100 ms proxy)
+      - dropout proxy using rho
+    This is enough to demonstrate end-to-end “queues influence actions”.
+
+WHERE IN CODE:
+  - impl/rl/dpp.py -> constraints(), update_virtual_queues()
+  - impl/fl/strategy.py -> aggregate_fit(): computes g and updates Q
+
+WHAT’S NOT FULLY DONE YET:
+  - A fully calibrated multi-stage queue model wired into the DPP constraints using
+    measured service distributions end-to-end.
+  - The repo contains analytic queue modules (impl/queueing/...), but the current
+    notebook’s core QRQ-FL loop uses the simpler proxy constraints above.
+
+
+Stage 5 — DPP (Drift-Plus-Penalty) scheduling: client + PQ scheme selection
+---------------------------------------------------------------------------
+THEORY:
+  At each round, choose:
+    - which clients to select
+    - which PQ scheme to use
+  by maximizing: V * reward(s,a) - Q(t) · max(g(s,a),0)
+
+PRACTICAL (ACHIEVED):
+  - Candidate actions are sampled (random subsets from a reliability-ranked pool).
+  - DPP chooses the best action across candidates.
+  - The chosen PQ scheme is sent to clients via Flower config.
+
+WHERE IN CODE:
+  - impl/rl/dpp.py -> candidate_actions(), dpp_select()
+  - impl/fl/strategy.py -> configure_fit(): builds State and selects Action
+
+OUTPUTS:
+  - Per-round chosen pq_scheme stored in server metrics.
+  - Virtual queue values Q tracked over rounds.
+
+
+Stage 6 — Post-quantum (PQ) crypto overhead modeling
+----------------------------------------------------
+THEORY:
+  PQ schemes introduce additional computational overhead; QRQ-FL may adaptively
+  pick a PQ scheme from a library.
+
+PRACTICAL (ACHIEVED WITH A STUB FALLBACK):
+  - impl/pqc/timing.py tries to measure real timings using liboqs-python.
+  - If liboqs is not available, it falls back to deterministic cycle-count stubs.
+  - Client simulates PQ overhead via sleep(time_sample(pq_scheme)) so the server’s
+    notion of per-round time accounts for PQ overhead.
+
+WHERE IN CODE:
+  - impl/pqc/timing.py -> measure()
+  - impl/fl/client.py -> time.sleep(pq_overhead_sampler(pq_scheme))
+  - impl/fl/strategy.py -> PQ timings cached per algo
+
+WHAT’S NOT FULLY DONE YET:
+  - Guaranteed “real PQ” measurements on Colab (liboqs builds can be hard).
+  - Actual cryptographic secure aggregation (currently simulated).
+
+
+Stage 7 — Federated aggregation (FedAvg)
+----------------------------------------
+THEORY:
+  Server aggregates client updates (FedAvg) to update the global model.
+
+PRACTICAL (ACHIEVED):
+  - Inherits Flower’s FedAvg aggregation via the Strategy base class.
+  - QRQ-FL focuses on selection + scheduling hooks; aggregation remains FedAvg.
+
+WHERE IN CODE:
+  - impl/fl/strategy.py -> QRQFLStrategy(FedAvg) + super().aggregate_fit()
+
+
+Stage 8 — Evaluation and artifacts
+----------------------------------
+THEORY:
+  Track accuracy, latency, reliability, chosen PQ scheme, and constraints over rounds.
+
+PRACTICAL (ACHIEVED):
+  - Centralized evaluation each round (loss + accuracy).
+  - Writes:
+      - figures/acc_centralized.png/pdf
+      - results.json (config + accuracy series + server metrics + PQ mean seconds)
+      - runs/<timestamp>/metrics_qrq.csv
+
+WHERE IN CODE:
+  - impl/QRQFL_colab.ipynb -> plot + results.json + downloads
+
+
+What is achieved practically “till now” (status summary)
+--------------------------------------------------------
+Implemented and runnable end-to-end:
+  - Real CIFAR dataset training in FL setting (Flower simulation)
+  - Non-IID Dirichlet partitioning into clients
+  - HMM-based dropout posterior rho_i(t) (based on missing/received updates)
+  - DPP-based per-round action selection (clients + PQ scheme)
+  - Virtual queue updates influencing scheduling
+  - PQ overhead measured if possible, otherwise stubbed, and reflected in runtime via sleep
+  - Centralized evaluation, plots, CSV + JSON artifacts
+
+Partially implemented / stubbed:
+  - True byzantine detection + “deviation flag” observations (emission supports it)
+  - Real cryptographic secure aggregation (currently simulated/stubbed)
+  - Fully calibrated multi-stage queueing constraints wired into the DPP objective
+  - Guaranteed liboqs measurements on Colab (depends on environment)
+

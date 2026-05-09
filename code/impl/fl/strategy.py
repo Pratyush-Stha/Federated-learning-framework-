@@ -96,14 +96,16 @@ class QRQFLStrategy(fl.server.strategy.FedAvg):
         ]) if self._obs_history else 0.0
         cfg_round = results[0][1].metrics if results else {}
         pq_scheme = cfg_round.get("pq_scheme", next(iter(self.cfg.pq_set)))
+        n_sel = max(len(results), 1)
         action_proxy = type("A", (), {
-            "selected": np.ones(max(len(results), 1), dtype=int),
+            "selected": np.ones(n_sel, dtype=int),
             "pq_scheme": pq_scheme,
-            "bandwidth": np.ones(max(len(results), 1)),
+            "bandwidth": np.ones(n_sel),
         })()
+        # constraints() indexes rho[selected]; rho must match selected length (not scalar).
         proxy_state = State(
-            rho=np.array([rho_now]),
-            snr=np.array([20.0]),
+            rho=np.full(n_sel, rho_now),
+            snr=np.full(n_sel, 20.0),
             queue_lengths=self._Q,
             pq_service_time=self._pq_cache,
         )
