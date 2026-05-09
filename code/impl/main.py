@@ -92,6 +92,9 @@ def main():
         # exponential around the mean to seed S^2 in the queue model
         return float(np.random.exponential(pq_means.get(algo, 0.01)))
 
+    # Ray virtual clients use num_gpus=0.0 — they cannot use .to("cuda").
+    client_device = "cpu"
+
     def client_fn(cid: str):
         i = int(cid)
         return QRQClient(
@@ -99,7 +102,7 @@ def main():
             model_factory=lambda: small_cnn(num_classes=100),
             train_loader=train_loaders[i],
             val_loader=val_loader,
-            device="cuda" if torch.cuda.is_available() else "cpu",
+            device=client_device,
             pq_overhead_sampler=overhead_sampler,
         ).to_client()
 

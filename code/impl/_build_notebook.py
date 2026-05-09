@@ -69,6 +69,8 @@ You get a **FedAvg** baseline (random client sampling) and **QRQ-FL** (DPP + HMM
 **Colab:** enable GPU (Runtime → Change runtime type). The last cell downloads `figures.zip` and `results.json` when `google.colab` is available.
 
 **Note:** `fl.simulation.start_simulation` needs **Ray**. This notebook installs `flwr[simulation]` (not plain `flwr`) so Ray is pulled in automatically.
+
+**Note:** Flower schedules virtual clients with `num_gpus=0`; Ray workers then have **no CUDA**. Local training uses **CPU** inside those actors; **centralized evaluation** still uses the Colab GPU when available (faster eval, correct semantics).
 """
 )
 
@@ -174,6 +176,12 @@ if DEVICE == "cuda":
     print(f"Device: {DEVICE} | {torch.cuda.get_device_name(0)} | tier={GPU_TIER}")
 else:
     print(f"Device: {DEVICE} (no GPU)")
+
+# Centralized eval runs in the notebook kernel (sees GPU). Flower Ray actors use
+# client_resources num_gpus=0.0 — those workers do not get a CUDA device, so
+# passing DEVICE="cuda" into QRQClient causes: No CUDA GPUs are available.
+CLIENT_DEVICE = "cpu" if DEVICE == "cuda" else DEVICE
+print(f"Client train device (Flower simulation): {CLIENT_DEVICE}  (server eval: {DEVICE})")
 """
 )
 
@@ -223,6 +231,7 @@ print(json.dumps({
     "BATCH_SIZE": BATCH_SIZE,
     "DIRICHLET_ALPHA": DIRICHLET_ALPHA,
     "DEVICE": DEVICE,
+    "CLIENT_DEVICE": CLIENT_DEVICE,
 }, indent=2))
 """
 )
@@ -324,7 +333,7 @@ def client_fn(cid: str) -> fl.client.Client:
         model_factory=lambda: small_cnn(NUM_CLASSES, IN_CHANNELS),
         train_loader=train_loaders[i],
         val_loader=val_loader,
-        device=DEVICE,
+        device=CLIENT_DEVICE,
         local_epochs=LOCAL_EPOCHS,
         pq_overhead_sampler=pq_sleep_sample,
     ).to_client()
@@ -389,7 +398,7 @@ if RUN_FEDAVG_BASELINE:
             model_factory=lambda: small_cnn(NUM_CLASSES, IN_CHANNELS),
             train_loader=train_loaders[i],
             val_loader=val_loader,
-            device=DEVICE,
+            device=CLIENT_DEVICE,
             local_epochs=LOCAL_EPOCHS,
             pq_overhead_sampler=lambda _a: 0.0,
         ).to_client()
