@@ -1,0 +1,89 @@
+# ── Python ───────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# ── Virtual environments ─────────────────────────────────────────────
+.venv/
+venv/
+env/
+.python-version
+
+# ── Jupyter ──────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+.jupyter/
+
+# ── Datasets and large downloaded files ──────────────────────────────
+data_cache/
+data/cifar*/
+data/mnist/
+data/femnist/
+data/mimic*/
+*.tar.gz
+*.zip
+
+# ── Experiment outputs ───────────────────────────────────────────────
+runs/
+results/
+figures/*.pdf
+figures/*.png
+!figures/.gitkeep
+
+# ── LaTeX build artifacts ────────────────────────────────────────────
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+*.idx
+*.ind
+*.ilg
+*.gz
+main.pdf
+
+# ── IDE / OS ─────────────────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# ── Credentials and large reference docs ─────────────────────────────
+.env
+*.pem
+*.key
+
+# ── Reference PDFs and .docx notes ───────────────────────────────────
+# These are copyrighted research papers / personal notes. They live
+# locally so you can read them while editing main.tex, but they should
+# not be pushed to a public GitHub repo. Comment any line below if you
+# do want a particular file in the repo.
+*.pdf
+*.docx
+!figures/*.pdf
+
+# ── Paper sources and private docs (kept LOCAL only) ─────────────────
+# The GitHub repo is intended to host ONLY the code Colab needs to run
+# the experiments. Drafts, the paper itself, and internal reports stay
+# off GitHub.
+main.tex
+IMPLEMENTATION_REPORT.md
+*.tex
+!impl/**/*.tex
+NOTES.md
+DRAFT*.md
+
