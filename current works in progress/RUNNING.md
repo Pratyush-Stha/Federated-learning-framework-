@@ -2,7 +2,7 @@
 
 This repo’s **primary entry point** is the notebook:
 
-- `impl/QRQFL_colab.ipynb`
+- `code/impl/QRQFL_colab.ipynb`
 
 It runs on **Google Colab** and **locally**. The notebook downloads a **real dataset** (CIFAR-10/100) via `torchvision`, partitions it non‑IID, and runs the full QRQ‑FL stack.
 
@@ -29,7 +29,7 @@ cd <your-repo-folder>
 ### 2) Create and activate a virtual environment
 
 ```powershell
-cd impl
+cd code\impl
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
@@ -86,13 +86,13 @@ In the browser UI, open `QRQFL_colab.ipynb` and click **Kernel → Restart & Run
 
 After a full run you should have:
 
-- `impl/figures/` (plots, e.g. `acc_centralized.png/pdf`)
-- `impl/results.json`
-- `impl/runs/<timestamp>/metrics_qrq.csv` (server-side QRQ metrics)
+- `code/impl/figures/` (plots, e.g. `acc_centralized.png/pdf`)
+- `code/impl/results.json`
+- `code/impl/runs/<timestamp>/metrics_qrq.csv` (server-side QRQ metrics)
 
 ### 7) (Optional) Rebuild the notebook from the source modules
 
-If you edit any module under `impl/` and want the notebook to be regenerated consistently:
+If you edit any module under `code/impl/` and want the notebook to be regenerated consistently:
 
 ```powershell
 python _build_notebook.py
@@ -115,13 +115,15 @@ You have 3 common ways to open the notebook in Colab. Pick one.
 
 1. Push this repo to GitHub (or any public Git host Colab can access).
 2. In Colab: **File → Open notebook → GitHub**.
-3. Paste your repo URL and open `impl/QRQFL_colab.ipynb`.
+3. Paste your repo URL and open `code/impl/QRQFL_colab.ipynb`.
+   (After the repo re-org, the path is `code/impl/QRQFL_colab.ipynb`.)
 
 ### Option B: Upload just the notebook
 
 1. Go to Colab: `https://colab.research.google.com/`
 2. **File → Upload notebook**
-3. Upload `impl/QRQFL_colab.ipynb`
+3. Upload `code/impl/QRQFL_colab.ipynb`
+   (After the repo re-org, the file is at `code/impl/QRQFL_colab.ipynb`.)
 
 Note: if you upload only the notebook (without the repo files), it will still run because the notebook **inlines** the needed modules, but you won’t have the repo structure for saving extra artifacts the same way.
 
@@ -129,7 +131,7 @@ Note: if you upload only the notebook (without the repo files), it will still ru
 
 1. Open a new Colab notebook (blank is fine).
 2. In the left sidebar **Files**, click **Upload**.
-3. Upload the whole `impl/` folder contents (or a zip you extract).
+3. Upload the whole `code/impl/` folder contents (or a zip you extract).
 4. Open and run `QRQFL_colab.ipynb`.
 
 ### 1) Enable GPU
@@ -169,7 +171,8 @@ If downloads don’t trigger, you can manually download from the Colab **Files**
 
 ## What to run (recommended)
 
-- **Most users**: run `impl/QRQFL_colab.ipynb` on Colab GPU.
+- **Most users**: run `code/impl/QRQFL_colab.ipynb` on Colab GPU.
+- After the repo re-org: run `code/impl/QRQFL_colab.ipynb`.
 - **Local**: run the same notebook using the “Local run” steps above.
 
 ---
@@ -178,12 +181,14 @@ If downloads don’t trigger, you can manually download from the Colab **Files**
 
 There is also a CLI entry point:
 
-- `impl/main.py`
+- `code/impl/main.py`
+- After the repo re-org: `code/impl/main.py`
 
-Example (from `impl/` with an active venv):
+Example (from `code/impl/` with an active venv):
+After the repo re-org: run it from `code/impl/`.
 
 ```powershell
-pip install flwr
+pip install "flwr[simulation]>=1.8.0,<2"
 python main.py --dataset cifar100 --clients 50 --rounds 20 --alpha 0.3 --batch 64 --schedule dpp
 ```
 

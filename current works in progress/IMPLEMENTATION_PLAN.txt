@@ -7,10 +7,10 @@ Goal: Provide a stage-by-stage description of how QRQ-FL is implemented in this 
 what the intended theory/idea is, and what is actually achieved practically today.
 
 Primary runnable artifact:
-  - impl/QRQFL_colab.ipynb  (runs on Google Colab + locally)
+  - code/impl/QRQFL_colab.ipynb  (runs on Google Colab + locally)
 
 Secondary runnable artifact (advanced):
-  - impl/main.py (Flower-based CLI driver; notebook is preferred)
+  - code/impl/main.py (Flower-based CLI driver; notebook is preferred)
 
 
 Stage 0 — Baseline problem definition
@@ -28,7 +28,7 @@ PRACTICAL (THIS REPO):
   - Evaluates global model accuracy centrally each round.
 
 WHERE IN CODE:
-  - impl/QRQFL_colab.ipynb (dataset choice, federation size, run loop)
+  - code/impl/QRQFL_colab.ipynb (dataset choice, federation size, run loop)
 
 
 Stage 1 — Real dataset and non-IID client partitioning
@@ -43,8 +43,8 @@ PRACTICAL (ACHIEVED):
   - Each client gets its own DataLoader.
 
 WHERE IN CODE:
-  - impl/data/partition.py -> dirichlet_partition()
-  - impl/QRQFL_colab.ipynb -> “Real dataset + Dirichlet non-IID split”
+  - code/impl/data/partition.py -> dirichlet_partition()
+  - code/impl/QRQFL_colab.ipynb -> “Real dataset + Dirichlet non-IID split”
 
 OUTPUTS:
   - Printed min/median/max client dataset sizes
@@ -56,12 +56,12 @@ THEORY:
   Each selected client runs local SGD for E local epochs and returns updated weights.
 
 PRACTICAL (ACHIEVED):
-  - A small CNN is used (same architecture pattern as impl/main.py).
+  - A small CNN is used (same architecture pattern as code/impl/main.py).
   - Each selected client trains for LOCAL_EPOCHS using SGD.
 
 WHERE IN CODE:
-  - impl/QRQFL_colab.ipynb -> model definition + hyperparameters
-  - impl/fl/client.py -> QRQClient.fit() local SGD implementation
+  - code/impl/QRQFL_colab.ipynb -> model definition + hyperparameters
+  - code/impl/fl/client.py -> QRQClient.fit() local SGD implementation
 
 OUTPUTS:
   - Centralized test accuracy and loss each round (server-side evaluation).
@@ -84,8 +84,8 @@ PRACTICAL (ACHIEVED):
   - rho_i(t) is computed from the filtered posterior and used in scheduling.
 
 WHERE IN CODE:
-  - impl/hmm/reliability.py -> forward(), dropout_probability(), HMMParams
-  - impl/fl/strategy.py -> configure_fit(): computes rho from obs history
+  - code/impl/hmm/reliability.py -> forward(), dropout_probability(), HMMParams
+  - code/impl/fl/strategy.py -> configure_fit(): computes rho from obs history
 
 WHAT’S NOT FULLY DONE YET:
   - A real “deviation-flag” detector and true Byzantine behavior simulation.
@@ -109,13 +109,13 @@ PRACTICAL (PARTIALLY ACHIEVED):
     This is enough to demonstrate end-to-end “queues influence actions”.
 
 WHERE IN CODE:
-  - impl/rl/dpp.py -> constraints(), update_virtual_queues()
-  - impl/fl/strategy.py -> aggregate_fit(): computes g and updates Q
+  - code/impl/rl/dpp.py -> constraints(), update_virtual_queues()
+  - code/impl/fl/strategy.py -> aggregate_fit(): computes g and updates Q
 
 WHAT’S NOT FULLY DONE YET:
   - A fully calibrated multi-stage queue model wired into the DPP constraints using
     measured service distributions end-to-end.
-  - The repo contains analytic queue modules (impl/queueing/...), but the current
+  - The repo contains analytic queue modules (code/impl/queueing/...), but the current
     notebook’s core QRQ-FL loop uses the simpler proxy constraints above.
 
 
@@ -133,8 +133,8 @@ PRACTICAL (ACHIEVED):
   - The chosen PQ scheme is sent to clients via Flower config.
 
 WHERE IN CODE:
-  - impl/rl/dpp.py -> candidate_actions(), dpp_select()
-  - impl/fl/strategy.py -> configure_fit(): builds State and selects Action
+  - code/impl/rl/dpp.py -> candidate_actions(), dpp_select()
+  - code/impl/fl/strategy.py -> configure_fit(): builds State and selects Action
 
 OUTPUTS:
   - Per-round chosen pq_scheme stored in server metrics.
@@ -148,15 +148,15 @@ THEORY:
   pick a PQ scheme from a library.
 
 PRACTICAL (ACHIEVED WITH A STUB FALLBACK):
-  - impl/pqc/timing.py tries to measure real timings using liboqs-python.
+  - code/impl/pqc/timing.py tries to measure real timings using liboqs-python.
   - If liboqs is not available, it falls back to deterministic cycle-count stubs.
   - Client simulates PQ overhead via sleep(time_sample(pq_scheme)) so the server’s
     notion of per-round time accounts for PQ overhead.
 
 WHERE IN CODE:
-  - impl/pqc/timing.py -> measure()
-  - impl/fl/client.py -> time.sleep(pq_overhead_sampler(pq_scheme))
-  - impl/fl/strategy.py -> PQ timings cached per algo
+  - code/impl/pqc/timing.py -> measure()
+  - code/impl/fl/client.py -> time.sleep(pq_overhead_sampler(pq_scheme))
+  - code/impl/fl/strategy.py -> PQ timings cached per algo
 
 WHAT’S NOT FULLY DONE YET:
   - Guaranteed “real PQ” measurements on Colab (liboqs builds can be hard).
@@ -173,7 +173,7 @@ PRACTICAL (ACHIEVED):
   - QRQ-FL focuses on selection + scheduling hooks; aggregation remains FedAvg.
 
 WHERE IN CODE:
-  - impl/fl/strategy.py -> QRQFLStrategy(FedAvg) + super().aggregate_fit()
+  - code/impl/fl/strategy.py -> QRQFLStrategy(FedAvg) + super().aggregate_fit()
 
 
 Stage 8 — Evaluation and artifacts
@@ -189,7 +189,7 @@ PRACTICAL (ACHIEVED):
       - runs/<timestamp>/metrics_qrq.csv
 
 WHERE IN CODE:
-  - impl/QRQFL_colab.ipynb -> plot + results.json + downloads
+  - code/impl/QRQFL_colab.ipynb -> plot + results.json + downloads
 
 
 What is achieved practically “till now” (status summary)

@@ -15,10 +15,8 @@ scikit-learn>=1.4
 hmmlearn>=0.3
 simpy>=4.1
 
-# ?? Optional: Flower-based simulation driver (impl/main.py) ?????????
-# Uses Ray under the hood — install only if you intend to run main.py;
-# the Colab notebook does NOT need this.
-# flwr>=1.10
+# Flower + Ray (required for fl.simulation.start_simulation in QRQFL_colab.ipynb and main.py)
+flwr[simulation]>=1.8.0,<2
 
 # ?? Optional: RL libraries (only used by the DPP-RL extension) ??????
 # stable-baselines3>=2.3

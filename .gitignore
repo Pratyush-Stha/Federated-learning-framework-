@@ -83,7 +83,7 @@ Thumbs.db
 main.tex
 IMPLEMENTATION_REPORT.md
 *.tex
-!impl/**/*.tex
+!code/impl/**/*.tex
 NOTES.md
 DRAFT*.md
 

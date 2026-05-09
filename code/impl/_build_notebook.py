@@ -67,6 +67,8 @@ This notebook runs the **same stack as `main.py`** end-to-end:
 You get a **FedAvg** baseline (random client sampling) and **QRQ-FL** (DPP + HMM + PQ set), with **centralized test accuracy each round**, metric CSV, plots, and `results.json`.
 
 **Colab:** enable GPU (Runtime → Change runtime type). The last cell downloads `figures.zip` and `results.json` when `google.colab` is available.
+
+**Note:** `fl.simulation.start_simulation` needs **Ray**. This notebook installs `flwr[simulation]` (not plain `flwr`) so Ray is pulled in automatically.
 """
 )
 
@@ -85,14 +87,28 @@ def pip_install(pkg: str) -> None:
     subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", pkg])
 
 
-# Flower + scientific stack (torch/torchvision preinstalled on Colab)
-for pkg in ("flwr>=1.8.0,<2", "matplotlib", "pandas", "tqdm"):
+def have_ray() -> bool:
     try:
-        if pkg.startswith("flwr"):
-            import flwr  # noqa: F401
-        elif pkg.startswith("matplotlib"):
+        import ray  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+# Flower simulation backend requires Ray — use the official extra (see flwr error message).
+FLWR_SIM = "flwr[simulation]>=1.8.0,<2"
+try:
+    import flwr  # noqa: F401
+    if not have_ray():
+        pip_install(FLWR_SIM)
+except ImportError:
+    pip_install(FLWR_SIM)
+
+for pkg in ("matplotlib", "pandas", "tqdm"):
+    try:
+        if pkg == "matplotlib":
             import matplotlib  # noqa: F401
-        elif pkg.startswith("pandas"):
+        elif pkg == "pandas":
             import pandas  # noqa: F401
         else:
             import tqdm  # noqa: F401
@@ -103,6 +119,10 @@ import torch
 print(f"torch:      {torch.__version__}")
 import flwr as fl
 print(f"flwr:       {fl.__version__}")
+if not have_ray():
+    raise RuntimeError("Ray is still missing after installing flwr[simulation]. Run: pip install -U 'flwr[simulation]'")
+import ray
+print(f"ray:        {ray.__version__}")
 """
 )
 
