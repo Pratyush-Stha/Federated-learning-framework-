@@ -568,13 +568,29 @@ code(
     """RUN_BASELINE_GRID = False  # set True to actually launch all 7 methods
 
 if RUN_BASELINE_GRID:
-    import importlib, sys
-    # Bring run_baselines.py into the kernel even though Colab clones the repo flat.
-    sys.path.insert(0, str(pathlib.Path('.').resolve()))
-    try:
-        from code.impl import run_baselines
-    except ImportError:
-        import run_baselines  # type: ignore
+    import importlib
+    import sys
+
+    # Colab cwd is often repo root or Google Drive mount — ``code.impl`` is not a package.
+    # Put the directory that contains ``run_baselines.py`` on sys.path and import the module.
+    _root = pathlib.Path.cwd().resolve()
+    _candidates = [
+        _root / "code" / "impl" / "run_baselines.py",
+        _root / "impl" / "run_baselines.py",
+        _root / "run_baselines.py",
+    ]
+    _rb = next((p for p in _candidates if p.is_file()), None)
+    if _rb is None:
+        raise FileNotFoundError(
+            "run_baselines.py not found. Tried:\\n"
+            + "\\n".join(f"  - {p}" for p in _candidates)
+            + "\\nFix: upload/clone the full ``papers`` repo, or ``%cd code/impl`` "
+            "and re-run this cell."
+        )
+    _impl_dir = str(_rb.parent)
+    if _impl_dir not in sys.path:
+        sys.path.insert(0, _impl_dir)
+    import run_baselines  # noqa: E402
     importlib.reload(run_baselines)
 
     out = pathlib.Path('runs') / time.strftime('baselines_%Y%m%d_%H%M%S')
