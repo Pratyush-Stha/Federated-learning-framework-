@@ -373,7 +373,15 @@ evaluate_fn = make_evaluate_fn()
 """
 )
 
-md("## 12. Run simulations")
+md(
+    """## 12. Run simulations
+
+Two paths are available:
+
+* **Quick path** (this section): one FedAvg baseline + one QRQ-FL run. This is what the verified Section IV table is built from.
+* **Publication baselines** (Section 15): runs the full grid (FedAvg, FedAvg+Kyber, FedProx, QRQ-FL, and three QRQ-FL ablations) and writes consolidated artefacts under `runs/baselines_<timestamp>/`. Use that section when you regenerate the paper tables.
+"""
+)
 code(
     """RUN_DIR = pathlib.Path("runs") / time.strftime("%Y%m%d_%H%M%S")
 RUN_DIR.mkdir(parents=True, exist_ok=True)
@@ -539,6 +547,50 @@ if COLAB:
     files.download("results.json")
 else:
     print("Local run: see figures/, results.json, and runs/")
+"""
+)
+
+# ── 15: full publication-baseline grid ───────────────────────────────
+md(
+    """## 15. Publication baseline grid (optional)
+
+Run the full method grid (FedAvg, FedAvg+Kyber, FedProx, QRQ-FL, and three
+QRQ-FL ablations) under the same protocol as above. Produces a consolidated
+``summary.json`` and ``accuracy_curves.csv`` that can be fed into
+``code/impl/build_paper_tables.py`` to regenerate the LaTeX tables and
+figures included from ``main.tex``.
+
+Skip this cell if you only need the quick FedAvg-vs-QRQ-FL trace from
+Section 12.
+"""
+)
+code(
+    """RUN_BASELINE_GRID = False  # set True to actually launch all 7 methods
+
+if RUN_BASELINE_GRID:
+    import importlib, sys
+    # Bring run_baselines.py into the kernel even though Colab clones the repo flat.
+    sys.path.insert(0, str(pathlib.Path('.').resolve()))
+    try:
+        from code.impl import run_baselines
+    except ImportError:
+        import run_baselines  # type: ignore
+    importlib.reload(run_baselines)
+
+    out = pathlib.Path('runs') / time.strftime('baselines_%Y%m%d_%H%M%S')
+    run_baselines.main([
+        '--dataset', DATASET,
+        '--clients', str(N_CLIENTS),
+        '--select',  str(N_SELECT),
+        '--rounds',  str(N_ROUNDS),
+        '--alpha',   str(DIRICHLET_ALPHA),
+        '--batch',   str(BATCH_SIZE),
+        '--seed',    str(SEED),
+        '--out',     str(out),
+    ])
+    print(f'Done. Pass {out} to build_paper_tables.py to refresh paper artefacts.')
+else:
+    print('Set RUN_BASELINE_GRID=True to run all 7 publication baselines.')
 """
 )
 

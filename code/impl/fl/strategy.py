@@ -34,10 +34,26 @@ class QRQConfig:
     V: float = 2.0
     pq_set: tuple[str, ...] = ("kyber512", "dilithium2", "falcon-512")
     deadline_s: float = 2.0
+    # --- ablation / variant flags ---
+    # use_hmm=False  -> rho_i is replaced by a uniform value (no reliability bias)
+    # use_dpp=False  -> selection ignores virtual queues and reward; picks top-k
+    #                   by reliability (or random when use_hmm=False)
+    # fixed_pq       -> when set, the chosen scheme is forced every round; this
+    #                   disables PQ-arm of DPP but leaves client selection intact
+    # proximal_mu    -> if > 0, broadcast a FedProx mu so clients add a proximal
+    #                   regulariser to their local SGD loss
+    use_hmm: bool = True
+    use_dpp: bool = True
+    fixed_pq: str | None = None
+    proximal_mu: float = 0.0
 
 
 class QRQFLStrategy(fl.server.strategy.FedAvg):
-    """FedAvg + HMM + queueing + DPP + (optional) PQ stub."""
+    """FedAvg + HMM + queueing + DPP + (optional) PQ stub.
+
+    Ablation modes are selected via the ``QRQConfig`` flags; setting them all
+    off reduces the strategy to plain FedAvg with random client sampling.
+    """
 
     def __init__(self, *args, qrq: QRQConfig | None = None, hmm: HMMParams | None = None, **kw):
         super().__init__(*args, **kw)
@@ -49,29 +65,52 @@ class QRQFLStrategy(fl.server.strategy.FedAvg):
         self._pq_cache: dict[str, float] = {
             algo: measure_pq(algo, n=20).mean for algo in self.cfg.pq_set
         }
+        self._rng = np.random.default_rng(0)
 
     # --- selection ---------------------------------------------------
+    def _select_clients(self, all_clients, rho: np.ndarray):
+        """Pick the round's selected clients honouring use_hmm / use_dpp."""
+        n = len(all_clients)
+        k = min(self.cfg.n_select, n)
+        if self.cfg.use_dpp:
+            snr = np.full(n, 20.0)
+            state = State(rho=rho, snr=snr, queue_lengths=self._Q,
+                          pq_service_time=self._pq_cache)
+            action = dpp_select(state, V=self.cfg.V, k=k,
+                                pq_set=list(self.cfg.pq_set))
+            chosen_idx = [i for i, x in enumerate(action.selected) if x]
+            scheme = action.pq_scheme
+        else:
+            if self.cfg.use_hmm:
+                chosen_idx = list(np.argsort(rho)[:k])
+            else:
+                chosen_idx = list(self._rng.choice(n, size=k, replace=False))
+            scheme = self.cfg.fixed_pq or next(iter(self.cfg.pq_set))
+        if self.cfg.fixed_pq is not None:
+            scheme = self.cfg.fixed_pq
+        return chosen_idx, scheme
+
     def configure_fit(self, server_round, parameters, client_manager: ClientManager):
         all_clients = list(client_manager.all().values())
         if not all_clients:
             return []
         cids = [c.cid for c in all_clients]
 
-        rho = np.array([
-            dropout_probability(np.asarray(self._obs_history[cid] or [0]), self.hmm)
-            for cid in cids
-        ])
-        snr = np.full(len(cids), 20.0)  # plug in real SNR from your sim
-        state = State(rho=rho, snr=snr, queue_lengths=self._Q,
-                      pq_service_time=self._pq_cache)
-        action = dpp_select(state, V=self.cfg.V, k=self.cfg.n_select,
-                            pq_set=list(self.cfg.pq_set))
+        if self.cfg.use_hmm:
+            rho = np.array([
+                dropout_probability(np.asarray(self._obs_history[cid] or [0]), self.hmm)
+                for cid in cids
+            ])
+        else:
+            rho = np.full(len(cids), 0.5)
 
-        chosen = [all_clients[i] for i, x in enumerate(action.selected) if x]
+        chosen_idx, scheme = self._select_clients(all_clients, rho)
+        chosen = [all_clients[i] for i in chosen_idx]
         cfg = {
             "round": server_round,
-            "pq_scheme": action.pq_scheme,
+            "pq_scheme": scheme,
             "deadline_s": self.cfg.deadline_s,
+            "proximal_mu": float(self.cfg.proximal_mu),
         }
         return [(c, FitIns(parameters, cfg)) for c in chosen]
 

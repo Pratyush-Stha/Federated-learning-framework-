@@ -48,6 +48,11 @@ class QRQClient(fl.client.NumPyClient):
 
     def fit(self, parameters, config):
         self.set_parameters(parameters)
+        # Snapshot the global parameters for the optional FedProx proximal term.
+        global_snapshot = [
+            torch.tensor(p, device=self.device).detach() for p in parameters
+        ]
+        mu = float(config.get("proximal_mu", 0.0) or 0.0)
         opt = torch.optim.SGD(self.model.parameters(), lr=0.01, momentum=0.9)
         loss_fn = torch.nn.CrossEntropyLoss()
         self.model.train()
@@ -55,7 +60,13 @@ class QRQClient(fl.client.NumPyClient):
             for xb, yb in self.train_loader:
                 xb, yb = xb.to(self.device), yb.to(self.device)
                 opt.zero_grad()
-                loss_fn(self.model(xb), yb).backward()
+                loss = loss_fn(self.model(xb), yb)
+                if mu > 0.0:
+                    prox = 0.0
+                    for p, g in zip(self.model.parameters(), global_snapshot):
+                        prox = prox + ((p - g) ** 2).sum()
+                    loss = loss + 0.5 * mu * prox
+                loss.backward()
                 opt.step()
         # Simulate PQ encryption overhead so the server-side queue sees it.
         time.sleep(self.pq_overhead_sampler(config.get("pq_scheme", "kyber512")))
